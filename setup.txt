@@ -1,0 +1,4 @@
+npx create-react-app chat-frontend
+cd chat-frontend
+npm install socket.io-client react-router-dom tailwindcss
+npx tailwindcss init

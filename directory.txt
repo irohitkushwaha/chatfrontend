@@ -1,0 +1,10 @@
+src/
+  components/
+    ChatList.js
+    ChatWindow.js
+    MessageInput.js
+    UserStatus.js
+  pages/
+    ChatPage.js
+  App.js
+  index.js
