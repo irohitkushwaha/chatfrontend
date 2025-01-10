@@ -6,10 +6,13 @@ import { io } from "socket.io-client";
 const socket = io("http://localhost:3000"); // Backend WebSocket URL
 
 function ChatPage() {
-  const [users, setUsers] = useState([]);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [messages, setMessages] = useState([]);
-  const [currentUser, setCurrentUser] = useState({}); // Mock current user
+  const [users, setUsers] = useState([]); // List of users
+  const [selectedUser, setSelectedUser] = useState(null); // Currently selected user
+  const [messages, setMessages] = useState([]); // All messages
+  const [currentUser, setCurrentUser] = useState({
+    _id: "123", // Mock current user
+    username: "John Doe",
+  });
 
   // Fetch users and statuses on component mount
   useEffect(() => {
@@ -18,22 +21,26 @@ function ChatPage() {
       const data = await response.json();
       setUsers(data);
     }
+
     fetchUsers();
 
     // Emit online status to server
     socket.emit("user_connected", currentUser._id);
 
     return () => {
-      socket.emit("user_disconnected", currentUser._id); // Emit offline on unmount
+      // Emit offline status to server on component unmount
+      socket.emit("user_disconnected", currentUser._id);
     };
   }, [currentUser]);
 
-  // Listen for new messages
+  // Listen for server events
   useEffect(() => {
+    // Listen for new messages
     socket.on("new_message", (message) => {
       setMessages((prev) => [...prev, message]);
     });
 
+    // Listen for user status updates (online/offline/last seen)
     socket.on("user_status_update", (updatedUser) => {
       setUsers((prev) =>
         prev.map((user) =>
@@ -44,16 +51,48 @@ function ChatPage() {
       );
     });
 
-    return () => socket.off("new_message user_status_update");
+    return () => {
+      // Remove socket listeners on component unmount
+      socket.off("new_message");
+      socket.off("user_status_update");
+    };
   }, []);
+
+  // Handle read status when opening a chat window
+  useEffect(() => {
+    if (selectedUser) {
+      const unreadMessages = messages.filter(
+        (msg) =>
+          msg.sender === selectedUser._id &&
+          msg.receiver === currentUser._id &&
+          msg.status !== "read"
+      );
+
+      if (unreadMessages.length > 0) {
+        // Emit event to mark messages as "read"
+        const messageIds = unreadMessages.map((msg) => msg._id);
+        socket.emit("message_read", { messageIds });
+
+        // Update the local messages state
+        setMessages((prev) =>
+          prev.map((msg) =>
+            messageIds.includes(msg._id) ? { ...msg, status: "read" } : msg
+          )
+        );
+      }
+    }
+  }, [selectedUser, messages, currentUser._id]);
 
   return (
     <div className="flex h-screen">
+      {/* Chat List Component */}
       <ChatList
         users={users}
         onSelectUser={(user) => setSelectedUser(user)}
         currentUser={currentUser}
       />
+
+      {/* Chat Window Component */}
       {selectedUser && (
         <ChatWindow
           selectedUser={selectedUser}
